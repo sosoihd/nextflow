@@ -312,6 +312,9 @@ class GoogleBatchTaskHandler extends TaskHandler implements FusionAwareTask {
             if( batchConfig.getBootDiskImage() )
                 log.warn1 'Config option `google.batch.bootDiskImage` ignored because an instance template was specified'
 
+            if( batchConfig.getBootDiskType() )
+                log.warn1 'Config option `google.batch.bootDiskType` ignored because an instance template was specified'
+
             if( batchConfig.cpuPlatform )
                 log.warn1 'Config option `google.batch.cpuPlatform` ignored because an instance template was specified'
 
@@ -333,8 +336,14 @@ class GoogleBatchTaskHandler extends TaskHandler implements FusionAwareTask {
         else {
             final instancePolicy = AllocationPolicy.InstancePolicy.newBuilder()
 
-            if( batchConfig.getBootDiskImage() )
-                instancePolicy.setBootDisk( AllocationPolicy.Disk.newBuilder().setImage( batchConfig.getBootDiskImage() ) )
+            if( batchConfig.getBootDiskImage() || batchConfig.getBootDiskType() ) {
+                def bootDiskBuilder = AllocationPolicy.Disk.newBuilder()
+                if( batchConfig.getBootDiskImage() )
+                    bootDiskBuilder.setImage( batchConfig.getBootDiskImage() )
+                if( batchConfig.getBootDiskType() )
+                    bootDiskBuilder.setType( batchConfig.getBootDiskType() )
+                instancePolicy.setBootDisk( bootDiskBuilder )
+            }
 
             if( fusionEnabled() && !disk ) {
                 disk = new DiskResource(request: '375 GB', type: 'local-ssd')

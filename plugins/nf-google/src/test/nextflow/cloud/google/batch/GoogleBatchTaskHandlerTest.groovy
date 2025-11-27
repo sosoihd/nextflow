@@ -258,6 +258,90 @@ class GoogleBatchTaskHandlerTest extends Specification {
         req.getTaskGroups(0).getTaskSpec().getComputeResource().getBootDiskMib() == 100 * 1024
     }
 
+    def 'should create submit request with boot disk type only' () {
+        given:
+        def WORK_DIR = CloudStorageFileSystem.forBucket('foo').getPath('/scratch')
+        def CONTAINER_IMAGE = 'debian:latest'
+        def BOOT_DISK_TYPE = 'hyperdisk-balanced'
+        def exec = Mock(GoogleBatchExecutor) {
+            getBatchConfig() >> Mock(BatchConfig) {
+                getBootDiskType() >> BOOT_DISK_TYPE
+            }
+        }
+        and:
+        def bean = new TaskBean(workDir: WORK_DIR, inputFiles: [:])
+        def task = Mock(TaskRun) {
+            toTaskBean() >> bean
+            getHashLog() >> 'abcd1234'
+            getWorkDir() >> WORK_DIR
+            getContainer() >> CONTAINER_IMAGE
+            getConfig() >> Mock(TaskConfig) {
+                getCpus() >> 2
+                getResourceLabels() >> [:]
+            }
+        }
+        and:
+        def mounts = ['/mnt/disks/foo/scratch:/mnt/disks/foo/scratch:rw']
+        def launcher = new GoogleBatchLauncherSpecMock('bash .command.run', mounts)
+
+        and:
+        def handler = Spy(new GoogleBatchTaskHandler(task, exec))
+
+        when:
+        def req = handler.newSubmitRequest(task, launcher)
+        then:
+        handler.fusionEnabled() >> false
+        handler.findBestMachineType(_, false) >> null
+
+        and:
+        def instancePolicy = req.getAllocationPolicy().getInstances(0).getPolicy()
+        instancePolicy.getBootDisk().getType() == BOOT_DISK_TYPE
+        !instancePolicy.getBootDisk().getImage()
+    }
+
+    def 'should create submit request with boot disk type and image' () {
+        given:
+        def WORK_DIR = CloudStorageFileSystem.forBucket('foo').getPath('/scratch')
+        def CONTAINER_IMAGE = 'debian:latest'
+        def BOOT_DISK_TYPE = 'pd-ssd'
+        def BOOT_DISK_IMAGE = 'batch-debian'
+        def exec = Mock(GoogleBatchExecutor) {
+            getBatchConfig() >> Mock(BatchConfig) {
+                getBootDiskType() >> BOOT_DISK_TYPE
+                getBootDiskImage() >> BOOT_DISK_IMAGE
+            }
+        }
+        and:
+        def bean = new TaskBean(workDir: WORK_DIR, inputFiles: [:])
+        def task = Mock(TaskRun) {
+            toTaskBean() >> bean
+            getHashLog() >> 'abcd1234'
+            getWorkDir() >> WORK_DIR
+            getContainer() >> CONTAINER_IMAGE
+            getConfig() >> Mock(TaskConfig) {
+                getCpus() >> 2
+                getResourceLabels() >> [:]
+            }
+        }
+        and:
+        def mounts = ['/mnt/disks/foo/scratch:/mnt/disks/foo/scratch:rw']
+        def launcher = new GoogleBatchLauncherSpecMock('bash .command.run', mounts)
+
+        and:
+        def handler = Spy(new GoogleBatchTaskHandler(task, exec))
+
+        when:
+        def req = handler.newSubmitRequest(task, launcher)
+        then:
+        handler.fusionEnabled() >> false
+        handler.findBestMachineType(_, false) >> null
+
+        and:
+        def instancePolicy = req.getAllocationPolicy().getInstances(0).getPolicy()
+        instancePolicy.getBootDisk().getType() == BOOT_DISK_TYPE
+        instancePolicy.getBootDisk().getImage() == BOOT_DISK_IMAGE
+    }
+
     def 'should use custom job name'() {
         given:
         def WORK_DIR = CloudStorageFileSystem.forBucket('foo').getPath('/scratch')
